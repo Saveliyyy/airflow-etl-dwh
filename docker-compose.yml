@@ -1,0 +1,34 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    ports:
+      - "8123:8123"
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"   # default без пароля — только для локальной разработки
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+  airflow:
+    image: apache/airflow:2.10.5-python3.11
+    command: standalone   # веб-интерфейс, планировщик и SQLite в одном контейнере — для учебного стенда
+    depends_on: [clickhouse]
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+      _PIP_ADDITIONAL_REQUIREMENTS: "clickhouse-connect==0.8.18"
+      PYTHONPATH: /opt/airflow
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./etl:/opt/airflow/etl
+      - ./sql:/opt/airflow/sql
+      - ./data:/opt/airflow/data
+
+volumes:
+  ch_data:
